@@ -1,61 +1,121 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   client.c                                           :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: emheuga <emheuga@student.42angouleme.fr>   +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/04/03 12:48:56 by emheuga           #+#    #+#             */
+/*   Updated: 2026/04/03 12:50:09 by emheuga          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include <signal.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
+#include <unistd.h>
 
-int ft_strlen(char* str){
-    int i = 0;
+volatile int	g_ack = 0;
 
-    while (str[i])
-        i++;
 
-    return (i);
+
+void	handler(int signum, siginfo_t *info, void *context)
+{
+	(void)signum;
+	(void)info;
+	(void)context;
+	g_ack = 1;
 }
 
-int main (int ac, char **av){
+void	send_len(int pid, int len)
+{
+	unsigned int	mask;
 
-    int i = 0;
-    int j;
-    unsigned int mask;
-    if (ac != 3){
-        return (0);
-    }
-    
-    // int len = ft_strlen(av[2]);
+	mask = 1 << 31;
+	while (mask)
+	{
+		if ((len & mask) == mask)
+			kill(pid, SIGUSR1);
+		else
+			kill(pid, SIGUSR2);
+		mask = mask >> 1;
+		while (!g_ack)
+			usleep(50);
+		g_ack = 0;
+	}
+}
 
-    // mask = 1 << 31;
-    // while (mask){
+int	send_text(int pid, char *text, int len)
+{
+	static int			i;
+	static int			j;
+	static unsigned int	mask;
 
-    //     sleep(3);
-    //     if ((len & mask) == mask)
-    //         kill(atoi(av[1]), SIGUSR1);
-    //     else
-    //         kill(atoi(av[1]), SIGUSR2);
+	i = 0;
+	j = 0;
+	mask = 1 << 7;
+	if (i < len + 1)
+	{
+		if (j < 8)
+		{
+			if ((text[i] & mask) == mask)
+			{
+				kill(pid, SIGUSR1);
+				while (!g_ack)
+					usleep(50);
+				g_ack = 0;
+			}
+			else
+			{
+				kill(pid, SIGUSR2);
+				while (!g_ack)
+					usleep(50);
+				g_ack = 0;
+			}
+			mask = mask >> 1;
+			j++;
+			return (1);
+		}
+		if (j == 8)
+		{
+			i++;
+			mask = 1 << 7;
+			j = 0;
+			return (1);
+		}
+	}
+	return (0);
+}
 
-    //     mask = mask >> 1;
-    // }
+int	ft_strlen(char *str)
+{
+	int	i;
 
-    usleep(100);
-    unsigned char c = av[2][0];
-    while (av[2][i]){
-        
-        j = 0;
-        mask = 128;
-        while (j < 8)
-        {
-                usleep(100 );
-                if ((av[2][i] & mask) == mask)
-                    kill(atoi(av[1]), SIGUSR1);
-                else
-                    kill(atoi(av[1]), SIGUSR2);
-            
-                // printf("mask = %d\n", mask);
-                // printf("c = %d\n", c);
-                mask = mask >> 1;    
-                j++;
-            }
-        
-        i++;
-    }
+	i = 0;
+	while (str[i])
+		i++;
+	return (i);
+}
 
+int	main(int ac, char **av)
+{
+	struct sigaction	sa;
+	char				*text;
+	int					len;
+	int					i;
+	int					pid;
+
+	i = 0;
+	pid = atoi(av[1]);
+	if (ac != 3)
+		return (0);
+	sa.sa_sigaction = handler;
+	sa.sa_flags = SA_SIGINFO;
+	sigemptyset(&sa.sa_mask);
+	sigaction(SIGUSR1, &sa, NULL);
+	len = ft_strlen(av[2]);
+	text = av[2];
+	send_len(pid, len);
+	while (send_text(pid, text, len))
+		i++;
 }

@@ -1,73 +1,127 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   server.c                                           :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: emheuga <emheuga@student.42angouleme.fr>   +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/04/03 12:49:51 by emheuga           #+#    #+#             */
+/*   Updated: 2026/04/03 12:50:09 by emheuga          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
-
-void handler (int signum){
-    
-    unsigned static int len = 0;
-    static int bit_len = 35;
-    
-    static char c = 0;
-    static int bit = 0;
-
-    // if (bit_len < 32){
-    //     if (signum == SIGUSR1){
-    //         len = len << 1;
-    //         len++;
-    //         bit_len++;
-    //     }
-    
-    //     else if(signum == SIGUSR2){
-    //     len = len << 1;
-    //     bit_len++;
-    // }
-    // }
-
-    // if (bit_len == 32){
-    //     printf("len = %d et bit_Len = %d\n", len, bit_len);
-
-
-    // }
-    if (bit_len >= 32){
-        if (signum == SIGUSR1)
-        {
-            c = c << 1;
-            c++;
-            bit++;
-        }
-        else if (signum == SIGUSR2)
-        {
-            c = c << 1;
-            bit++;
-        }
-        
-        if (bit == 8)
-        {
-            printf ("%c\n", c);
-            c = 0;
-            bit = 0;
-        }
-    }
+void	get_len(int signum, unsigned int *len, int *bit)
+{
+	if (signum == SIGUSR1)
+	{
+		*len = *len << 1;
+		(*len)++;
+		(*bit)++;
+	}
+	else if (signum == SIGUSR2)
+	{
+		*len = *len << 1;
+		(*bit)++;
+	}
 }
 
-int main (){
+int	get_text(int signum, char *text)
+{
+	static int	i;
+	static int	bit;
+	static char	c;
 
-    int pid = getpid();
-    struct sigaction sa;
+	i = 0;
+	bit = 0;
+	c = 0;
+	if (bit < 8)
+	{
+		if (signum == SIGUSR1)
+		{
+			c = c << 1;
+			c++;
+			bit++;
+		}
+		else if (signum == SIGUSR2)
+		{
+			c = c << 1;
+			bit++;
+		}
+	}
+	if (bit == 8)
+	{
+		if (c == 0)
+		{
+			write(1, text, i);
+			write(1, "\n", 1);
+			i = 0;
+			bit = 0;
+			c = 0;
+			return (1);
+		}
+		text[i] = c;
+		i++;
+		bit = 0;
+		c = 0;
+	}
+	return (0);
+}
 
-    sa.sa_handler = handler;
-    sa.sa_flags = SA_SIGINFO;
-    
-    sigaction(SIGUSR1, &sa, NULL);
-    sigaction(SIGUSR2, &sa, NULL);
-    
-    printf("PID : %d\n", pid);
-    
-    while(1){
-        pause();
-    } 
+void	handler(int signum, siginfo_t *info, void *context)
+{
+	static unsigned int	len;
+	static int			bit;
+	static char			*text;
+	int					client_pid;
 
-    
+	len = 0;
+	bit = 0;
+	client_pid = info->si_pid;
+	(void)context;
+	if (info->si_pid == getpid())
+		return ;
+	if (bit < 32)
+	{
+		get_len(signum, &len, &bit);
+		if (bit == 32)
+		{
+			text = malloc(len + 1);
+			if (!text)
+				return ;
+		}
+	}
+	else
+	{
+		if (get_text(signum, text) == 1)
+		{
+			free(text);
+			text = NULL;
+			len = 0;
+			bit = 0;
+		}
+	}
+	kill(client_pid, SIGUSR1);
+}
 
+int	main(void)
+{
+	int					pid;
+	struct sigaction	sa;
+
+	pid = getpid();
+	sa.sa_sigaction = handler;
+	sa.sa_flags = SA_SIGINFO;
+	sigemptyset(&sa.sa_mask);
+	sigaction(SIGUSR1, &sa, NULL);
+	sigaction(SIGUSR2, &sa, NULL);
+	printf("PID : %d\n", pid);
+	while (1)
+	{
+		pause();
+	}
 }
