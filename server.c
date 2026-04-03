@@ -35,10 +35,16 @@ int	get_text(int signum, char *text)
 	static int	i;
 	static int	bit;
 	static char	c;
+	static int	init;
 
-	i = 0;
-	bit = 0;
-	c = 0;
+	if (!init)
+	{
+		i = 0;
+		bit = 0;
+		c = 0;
+		init = 1;
+	}
+
 	if (bit < 8)
 	{
 		if (signum == SIGUSR1)
@@ -77,10 +83,16 @@ void	handler(int signum, siginfo_t *info, void *context)
 	static unsigned int	len;
 	static int			bit;
 	static char			*text;
+	static int			init;
 	int					client_pid;
 
+	if (!init){
 	len = 0;
 	bit = 0;
+	text = NULL;
+	init = 1;
+	}
+
 	client_pid = info->si_pid;
 	(void)context;
 	if (info->si_pid == getpid())
@@ -103,6 +115,7 @@ void	handler(int signum, siginfo_t *info, void *context)
 			text = NULL;
 			len = 0;
 			bit = 0;
+			init = 0;
 		}
 	}
 	kill(client_pid, SIGUSR1);

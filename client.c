@@ -45,46 +45,31 @@ void	send_len(int pid, int len)
 	}
 }
 
-int	send_text(int pid, char *text, int len)
+void	send_text(int pid, char *text, int len)
 {
-	static int			i;
-	static int			j;
-	static unsigned int	mask;
+	int				i;
+	int				j;
+	unsigned char	mask;
 
 	i = 0;
-	j = 0;
-	mask = 1 << 7;
-	if (i < len + 1)
+	while (i < len + 1)
 	{
-		if (j < 8)
+		j = 0;
+		mask = 1 << 7;
+		while (j < 8)
 		{
 			if ((text[i] & mask) == mask)
-			{
 				kill(pid, SIGUSR1);
-				while (!g_ack)
-					usleep(50);
-				g_ack = 0;
-			}
 			else
-			{
 				kill(pid, SIGUSR2);
-				while (!g_ack)
-					usleep(50);
-				g_ack = 0;
-			}
+			while (!g_ack)
+				usleep(50);
+			g_ack = 0;
 			mask = mask >> 1;
 			j++;
-			return (1);
 		}
-		if (j == 8)
-		{
-			i++;
-			mask = 1 << 7;
-			j = 0;
-			return (1);
-		}
+		i++;
 	}
-	return (0);
 }
 
 int	ft_strlen(char *str)
@@ -105,10 +90,10 @@ int	main(int ac, char **av)
 	int					i;
 	int					pid;
 
-	i = 0;
-	pid = atoi(av[1]);
 	if (ac != 3)
 		return (0);
+	i = 0;
+	pid = atoi(av[1]);
 	sa.sa_sigaction = handler;
 	sa.sa_flags = SA_SIGINFO;
 	sigemptyset(&sa.sa_mask);
@@ -116,6 +101,6 @@ int	main(int ac, char **av)
 	len = ft_strlen(av[2]);
 	text = av[2];
 	send_len(pid, len);
-	while (send_text(pid, text, len))
-		i++;
+	send_text(pid, text, len);
+
 }
